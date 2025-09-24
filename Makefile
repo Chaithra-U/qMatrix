@@ -4,33 +4,49 @@ AllTexFiles=book.tex $(foreach dir,$(TexFolders),$(wildcard $(dir)/*.tex))
 
 
 
-.PHONY : test
+.PHONY : test fastTest clean
 test:
-	make $(foreach f,$(testDs), testResults/qMatrix_$(f))
-	make $(foreach f,$(testDs), testResults/qMatrixTree_$(f))
-	make $(foreach f,$(testDs), testResults/qMatrixTreeFast_$(f))
+	make $(foreach f,$(testDs), testResults/$(f).ok)
 
-testResults/qMatrix_%: testDataSets/%
-	test -d testResults || mkdir testResults
-	time python3 qMatrix.py -o "$@" "$<" -i patient_ids -i id -oi "$@.pdf" -op "$@_points.csv" > "$@.log"
+testResults/%.csv.ok: testDataSets/%.csv
+	$(eval q := testResults/$*)
+	make "$q/brute-force.ok" "$q/tree.ok" "$q/tree-fast.ok"
+	touch "$@"
 
-testResults/qMatrixTree_%: testDataSets/%
-	test -d testResults || mkdir testResults
-	time python3 qMatrix.py -o "$@" "$<" -i patient_ids -i id --tree --log -oi "$@.pdf" -op "$@_points.csv" > "$@.log"
+testResults/%/brute-force.ok: testDataSets/%.csv
+	$(eval p := testResults/$*/brute-force)
+	mkdir -p "$p"
+	$(eval outParam := "-o=$p/qMatrix.csv" "-oi=$p/projection.pdf" "-op=$p/projection.csv" "-od=$p/dendrogram.pdf" "-ou=$p/umap.pdf")
+	$(eval config := -debug -i=patient_ids -i=id)
+	python3 qMatrix.py $(config) $(outParam) "$<" > "$p/log.txt" 2>&1
+	touch "$@"
+
+testResults/%/tree.ok: testDataSets/%.csv
+	$(eval p := testResults/$*/tree)
+	mkdir -p "$p"
+	$(eval outParam := "-o=$p/qMatrix.csv" "-oi=$p/projection.pdf" "-op=$p/projection.csv" "-od=$p/dendrogram.pdf" "-ou=$p/umap.pdf")
+	$(eval config := -tree -log -debug -i=patient_ids -i=id)
+	python3 qMatrix.py $(config) $(outParam) "$<" > "$p/log.txt" 2>&1
+	touch "$@"
   
-testResults/qMatrixTreeFast_%: testDataSets/%
-	test -d testResults || mkdir testResults
-	time python3 qMatrix.py -o "$@" "$<" -i patient_ids -i id --tree-fast --log -oi "$@.pdf" -op "$@_points.csv" > "$@.log"
+testResults/%/tree-fast.ok: testDataSets/%.csv
+	$(eval p := testResults/$*/tree-fast)
+	mkdir -p "$p"
+	$(eval outParam := "-o=$p/qMatrix.csv" "-oi=$p/projection.pdf" "-op=$p/projection.csv" "-od=$p/dendrogram.pdf" "-ou=$p/umap.pdf")
+	$(eval config := -tree-fast -log -debug -i=patient_ids -i=id)
+	python3 qMatrix.py $(config) $(outParam) "$<" > "$p/log.txt" 2>&1
+	touch "$@"
 
+clean:
+	-rm -r testResults
 
-.PHONY : fastTest
 fastTest:
 	# ===[ qMatrix ]==========================================================
-	python3 qMatrix.py -i patient_ids -i id -o - testDataSets/test_v1.csv
+	python3 qMatrix.py -i=patient_ids -i=id -o=- testDataSets/test_v1.csv
 	#
 	# ===[ qMatrix via tree (original version) ]==============================
-	python3 qMatrix.py -i patient_ids -i id --tree -o - testDataSets/test_v1.csv
+	python3 qMatrix.py -i=patient_ids -i=id -tree -o=- testDataSets/test_v1.csv
 	#
 	# ===[ qMatrix via tree (fast version) ]==================================
-	python3 qMatrix.py -i patient_ids -i id --tree-fast -o - testDataSets/test_v1.csv
+	python3 qMatrix.py -i=patient_ids -i=id -tree-fast -o=- testDataSets/test_v1.csv
   
